@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>fetch-1 filen</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+            crossorigin="anonymous"></script>
+</head>
+
+
+<body class="container">
+<h3>All Users</h3>
+<div style="height: 300px;overflow-y: scroll;">
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Age</th>
+            <th>Name</th>
+            <th>Gender</th>
+            <th>Email</th>
+            <th></th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody id="user-table-body">
+        </tbody>
+    </table>
+</div>
+<button type="button" class="btn btn-primary" id="btn-add-user">
+    Add new user
+</button>
+<p id="add-error-msg" class="alert alert-danger" style="max-width: 50%;display: none;" role="alert"></p>
+
+<!-- Modal -->
+<div class="modal fade" id="user-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-title">Add User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>User ID: <span id="user-id"></span></p>
+                <form>
+                    <div class="mb-3">
+                        <label for="input-age" class="form-label">Age</label>
+                        <input type="number" class="form-control" id="input-age">
+                    </div>
+                    <div class="mb-3">
+                        <label for="input-name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="input-name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="input-gender" class="form-label">Gender</label>
+                        <input type="text" class="form-control" id="input-gender">
+                    </div>
+                    <div class="mb-3">
+                        <label for="input-email" class="form-label">Email</label>
+                        <input type="text" class="form-control" id="input-email">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="btn-save" type="button" class="btn btn-primary" data-bs-dismiss="modal">Save changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--END OF MODAL -->
+
+</body>
+</html>
+
+<script>
+
+    function localCache(){
+        let users = []
+        //Funktion som tager imod en user og metode.. Hvis metoden er POST, så sætter man useren i localCache.
+        //hvis metoden er PUT, så leder man i cachen efter user.id og opdaterer den user i localCache
+        const addEdit = (user,method) =>{
+            if(method==="POST"){
+                users.push(user)
+            }
+            else if(method==="PUT") {
+                users = users.map(u => u.id == user.id ? user : u)
+            }
+        }
+        return {
+            getAll : () => users ,
+            addAll : (all) => users = all,
+            deleteOne: (id) => users = users.filter(u => u.id !== Number(id)),
+            findById : (id) => users.find(u => u.id == id ),
+            addEdit :addEdit
+        }
+    }
+
+    const URL = "http://localhost:3333/api/users";
+
+    function setUpHandlers() {
+        document.getElementById("user-table-body").onclick = handleTableClick
+        document.getElementById("btn-save").onclick = saveUser // save changes knappen
+        document.getElementById("btn-add-user").onclick = makeNewUser //Add new user knappen
+    }
+    setUpHandlers()
+
+    //Funktioner ude på vores main table. Tager sig af Delete og Edit
+    function handleTableClick(evt) {
+        evt.preventDefault()
+        evt.stopPropagation()
+        const target = evt.target;
+        //data-id-delete
+        if (target.dataset.idDelete) { //Hvis target har et dataset som hedder data-id-delete, så sker dette..
+            const idToDelete = Number(target.dataset.idDelete) // gemmer id værdi SOM NUMMER ISTEDET FOR STRING
+            const options = {      //kommentare længere nede om det samme
+                method: "DELETE",
+                headers: {'Accept': 'application/json'}
+            }
+            fetch(URL+"/"+idToDelete,options)
+            .then(res=>res.json())
+            .then(x=>{
+                cache.deleteOne(idToDelete)
+                makeRows()
+            })
+        }
+
+        if (target.dataset.idEdit) { //Fanger data-id-edit=${u.id}
+            const idToEdit = Number(target.dataset.idEdit)  //gemmer id værdi SOM NUMMER ISTEDET FOR STRING
+            const user = cache.findById(idToEdit) // finder den i cache
+            showModal(user) // viser den i Modal
+        }
+    }
+
+    function makeNewUser() {
+        showModal({
+            id: null,
+            age: "",
+            name: "",
+            gender: "",
+            email: ""
+        })
+    }
+
+    function showModal(user) {
+        const myModal = new bootstrap.Modal(document.getElementById('user-modal'))
+        document.getElementById("modal-title").innerText = user.id ? "Edit User" : "Add User" //Hvis der er et id, så bruger den Edit user
+        document.getElementById("user-id").innerText = user.id   // ^Hvis der ikke er et ID, så bruger den Add user ^
+        document.getElementById("input-age").value = user.age
+        document.getElementById("input-name").value = user.name // Hver linje tager fat i et element i MODAL
+        document.getElementById("input-gender").value = user.gender // og indsætter user'ens værdier
+        document.getElementById("input-email").value = user.email
+        myModal.show()
+    }
+
+    function saveUser() { //metode som bruges til at Create new user og Edit user
+        const user = {}
+        user.id = Number(document.getElementById("user-id").innerText)
+        user.age = document.getElementById("input-age").value
+        user.name = document.getElementById("input-name").value
+        user.gender = document.getElementById("input-gender").value
+        user.email = document.getElementById("input-email").value
+
+
+        //Figure out how to update local data  (gammel kommentar?)
+        const method = user.id ? "PUT" : "POST" //Findes id? Hvis true, PUT / EDIT.. ellers Create/POST
+
+        const url = (method === "PUT") ? URL+"/"+user.id : URL //hvis PUT sættes URL = URL/id
+                                                                //Ellers forbliver url det samme.
+        //læs kort om options nedenunder.
+        //basicly definerer vi, hvad Response skal indeholde
+        const options = {
+            method: method,
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(user) //(tror) request-bodyen er et json objekt, men vi vælger at få det tilbage som en String her
+        }
+
+
+        //fetch tager imod en resource, som er der hvor den skal hente info fra.. I dette tilfælde en URL..
+        //udover det, så tager den også imod en RequestInit, som fortæller hvilke custom indstillinger man vil have på sin request:
+        //såsom Method, headers, body (fra ovenover i options)
+        fetch(url,options) //første promise
+
+        .then(res=>{ //Andet promise
+            if(!res.ok){ //FEJLHÅNDTERING
+                throw "Failed to add or update users (age < 99, gender must be 'male' or 'female' and email must be Valid"
+            }
+            return res.json() //returnerer et json objekt fra requestet.
+        })
+        .then(user=>{ //Tredje promise
+            cache.addEdit(user,method)  //Tilføjer eller editer en user i localCache
+            makeRows() //tegner rows igen
+        })
+        .catch(e=>alert(e)) //hvis fejl findes, smid alert lol
+    }
+
+    function fetchUsers() {
+        fetch(URL) //Et promise som bliver til et Response objekt
+        .then(res => res.json()) //Promise, hvor Response-objektet omskrives til JSON (tror jeg :D)
+        .then(data=> { //promise, hvor hvert JSON object (kaldt data) bliver indsat i localCache array
+            cache.addAll(data)
+            makeRows()
+        })
+    }
+
+    function makeRows() { //tegner rows af strings ind i et array, og joiner dem til sidst.
+        const users = cache.getAll();
+        const rows = users.map(u => `
+         <tr>
+           <td>${u.id}</td>
+           <td>${encode(u.age)}</td>
+           <td>${encode(u.name)}</td>
+           <td>${u.gender}</td>
+           <td>${encode(u.email)}</td>
+           <td><a data-id-delete=${u.id}  href="#">Delete</td>
+           <td><a data-id-edit='${u.id}' href="#">Edit</a> </td>
+         </tr>
+        `)
+        document.getElementById("user-table-body").innerHTML = rows.join("")
+    }
+
+    const cache = localCache();
+    fetchUsers()
+/*
+    //Add lines below if you want to synchronise your local cache with possible changes from the server
+    //const reloadTime = 1000*10
+    //setInterval(fetchUsers,reloadTime)
+
+ */
+
+
+    //Utility function to escape "untrusted inputs"
+    function encode(str) {
+        str = ""+str
+        str = str.replace(/&/g, "&amp;");
+        str = str.replace(/>/g, "&gt;");
+        str = str.replace(/</g, "&lt;");
+        str = str.replace(/"/g, "&quot;");
+        str = str.replace(/'/g, "&#039;");
+        return str;
+    }
+
+</script>
